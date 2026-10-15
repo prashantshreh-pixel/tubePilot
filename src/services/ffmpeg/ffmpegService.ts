@@ -121,16 +121,20 @@ export class FFmpegService {
       `.replace(/\s+/g, ' ');
     }
 
+    const hasSourceImage = !!(sourceImagePath && fs.existsSync(sourceImagePath));
+    const inputArgs = hasSourceImage
+      ? ['-loop', '1', '-i', sourceImagePath]
+      : ['-f', 'lavfi', '-i', `color=c=0x0c0e14:s=${width}x${height}:d=${durationSeconds + 5}`];
+
     const args = [
       '-y', // Overwrite
-      '-loop', '1',
-      '-i', sourceImagePath,
+      ...inputArgs,
       '-filter_complex', filterComplex,
       '-map', '[v_out]',
       ...(includeAmbientAudio ? ['-map', '[a_out]', '-c:a', 'aac', '-b:a', '128k'] : ['-an']),
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-preset', 'veryfast',
+      '-preset', 'ultrafast',
       '-t', `${durationSeconds}`,
       outputPath,
     ];

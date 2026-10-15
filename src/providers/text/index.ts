@@ -31,9 +31,9 @@ export function getTextProvider(settings: AppSettings): TextProvider {
   }
 
   // Graceful fallback to any configured key, or Mock provider for instant demo
+  if (settings.geminiApiKey) return new GeminiProvider(settings.geminiApiKey);
   if (settings.anthropicApiKey) return new ClaudeProvider(settings.anthropicApiKey);
   if (settings.openaiApiKey) return new OpenAIProvider(settings.openaiApiKey);
-  if (settings.geminiApiKey) return new GeminiProvider(settings.geminiApiKey);
 
   return new MockTextProvider();
 }

@@ -15,6 +15,9 @@ export class ClaudeProvider implements TextProvider {
       throw new Error('Anthropic Claude API key is not configured. Please set your key in Settings.');
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -22,13 +25,15 @@ export class ClaudeProvider implements TextProvider {
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: this.model,
-        max_tokens: 4096,
+        max_tokens: 1200,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.text();

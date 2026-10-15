@@ -15,12 +15,16 @@ export class OpenAIProvider implements TextProvider {
       throw new Error('OpenAI API key is not configured. Please set your key in Settings.');
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: this.model,
         messages: [
@@ -28,8 +32,10 @@ export class OpenAIProvider implements TextProvider {
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.7,
+        max_tokens: 1200,
       }),
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.text();

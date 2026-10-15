@@ -27,7 +27,7 @@ Return a strict JSON object with this exact schema:
     "fontColor": "<e.g. #FFFF00 bright yellow with black outline>",
     "psychologicalTrigger": "<e.g. Urgency, Disbelief, Secret Revealed>"
   },
-  "visualChecklist": {
+  "checklist": {
     "highContrast": true,
     "mobileReadable": true,
     "singleFocalPoint": true,

@@ -187,6 +187,12 @@ export class DatabaseService {
         onboardingCompleted: false,
       };
 
+      if (!fs.existsSync(defaultSettings.outputDirectory!)) {
+        try {
+          fs.mkdirSync(defaultSettings.outputDirectory!, { recursive: true });
+        } catch {}
+      }
+
       this.saveSettings(defaultSettings);
     }
 
@@ -237,6 +243,12 @@ export class DatabaseService {
     const res = this.db.exec(`SELECT value FROM settings WHERE key = 'app_settings'`);
     if (res.length > 0 && res[0].values.length > 0) {
       const raw = JSON.parse(res[0].values[0][0] as string) as AppSettings;
+      // Ensure exports folder always exists on disk
+      if (raw.outputDirectory && !fs.existsSync(raw.outputDirectory)) {
+        try {
+          fs.mkdirSync(raw.outputDirectory, { recursive: true });
+        } catch {}
+      }
       // Decrypt secrets
       if (raw.anthropicApiKey) raw.anthropicApiKey = decryptSecret(raw.anthropicApiKey);
       if (raw.openaiApiKey) raw.openaiApiKey = decryptSecret(raw.openaiApiKey);
