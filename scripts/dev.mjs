@@ -2,24 +2,17 @@ import { spawn } from 'child_process';
 import { createServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { build } from './build-main.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function startDev() {
-  // 1. Build main and preload
-  const buildProc = spawn('node', [path.resolve(__dirname, 'build-main.mjs')], {
-    stdio: 'inherit',
-    shell: true,
-  });
-
-  await new Promise((resolve, reject) => {
-    buildProc.on('exit', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Main build failed with exit code ${code}`));
-    });
-  });
+  console.log('[dev] Building main and preload scripts...');
+  // 1. Build main and preload directly in-process (avoiding shell path quoting issues)
+  await build(false);
 
   // 2. Start Vite dev server for renderer
+  console.log('[dev] Starting Vite dev server...');
   const viteServer = await createServer({
     configFile: path.resolve(__dirname, '../vite.config.ts'),
     server: { port: 5173 },
@@ -32,7 +25,10 @@ async function startDev() {
 
   // Find electron executable from node_modules
   const electronPath = (await import('electron')).default;
-  const electronProc = spawn(electronPath, [path.resolve(__dirname, '../dist/main/index.js')], {
+  const mainScriptPath = path.resolve(__dirname, '../dist/main/index.cjs');
+
+  console.log(`[dev] Launching Electron (${electronPath})...`);
+  const electronProc = spawn(electronPath, [mainScriptPath], {
     stdio: 'inherit',
     env: {
       ...process.env,
@@ -40,9 +36,14 @@ async function startDev() {
     },
   });
 
-  electronProc.on('close', () => {
+  electronProc.on('error', (err) => {
+    console.error('[dev] Electron process failed to spawn:', err);
+  });
+
+  electronProc.on('close', (code) => {
+    console.log(`[dev] Electron closed with code ${code}`);
     viteServer.close();
-    process.exit(0);
+    process.exit(code || 0);
   });
 }
 

@@ -22,22 +22,22 @@ const commonOptions = {
   },
 };
 
-async function build() {
+export async function build(watchMode = isWatch) {
   const mainCtx = await esbuild.context({
     ...commonOptions,
     entryPoints: [path.resolve(__dirname, '../src/main/index.ts')],
-    outfile: path.resolve(__dirname, '../dist/main/index.js'),
+    outfile: path.resolve(__dirname, '../dist/main/index.cjs'),
     format: 'cjs',
   });
 
   const preloadCtx = await esbuild.context({
     ...commonOptions,
     entryPoints: [path.resolve(__dirname, '../src/preload/index.ts')],
-    outfile: path.resolve(__dirname, '../dist/preload/index.js'),
+    outfile: path.resolve(__dirname, '../dist/preload/index.cjs'),
     format: 'cjs',
   });
 
-  if (isWatch) {
+  if (watchMode) {
     await mainCtx.watch();
     await preloadCtx.watch();
     console.log('[esbuild] Watching main & preload scripts...');
@@ -50,7 +50,11 @@ async function build() {
   }
 }
 
-build().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// If executed directly from CLI (e.g. npm run build:main)
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  build().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+

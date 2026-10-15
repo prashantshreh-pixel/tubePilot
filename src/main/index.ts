@@ -18,7 +18,7 @@ async function createWindow() {
     backgroundColor: '#0c0e14',
     title: 'TubePilot - AI YouTube Growth Desktop App',
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: path.join(__dirname, '../preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,

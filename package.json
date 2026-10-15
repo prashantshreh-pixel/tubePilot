@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "TubePilot - AI YouTube Growth Desktop App",
-  "main": "dist/main/index.js",
+  "main": "dist/main/index.cjs",
   "scripts": {
     "dev:main": "node scripts/build-main.mjs --watch",
     "dev:renderer": "vite",

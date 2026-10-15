@@ -18,8 +18,11 @@ import {
   FileText,
   MessageSquare,
   ListOrdered,
+  Eye,
+  CheckCheck,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { WorkflowBar } from '../components/WorkflowBar';
 
 export const UploadKitsPage: React.FC = () => {
   const {
@@ -41,6 +44,7 @@ export const UploadKitsPage: React.FC = () => {
   const [privacyStatus, setPrivacyStatus] = useState<'private' | 'unlisted' | 'public'>('private');
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [viewFoldMode, setViewFoldMode] = useState<'full' | 'fold'>('fold');
 
   const kit = selectedUploadKit || uploadKits[0];
 
@@ -94,14 +98,27 @@ ${kit.pinnedComment}
     }
   };
 
+  // Split description into above fold (first 2 lines) and below fold
+  const descLines = (kit?.description || '').split('\n');
+  const aboveFold = descLines.slice(0, 2).join('\n');
+  const belowFold = descLines.slice(2).join('\n');
+
   return (
-    <div className="p-8 space-y-8 overflow-y-auto max-h-[calc(100vh-5rem)] select-none">
+    <div className="p-8 space-y-6 overflow-y-auto max-h-[calc(100vh-5rem)] select-none">
+      {/* Workflow Navigation Ribbon */}
+      <WorkflowBar />
+
       {/* Top Header & Selector */}
       <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Upload Kit Generator</h2>
+          <h2 className="text-lg font-bold text-white tracking-tight flex items-center space-x-2">
+            <span>Metadata & Upload Kits</span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+              SEO Optimized
+            </span>
+          </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Fold-optimized metadata, 3-5 hashtag rules, backend tags & SEO score tailored for Shorts and Long videos.
+            Fold-optimized descriptions, 3-5 hashtag rules, backend tags & SEO score tailored for Shorts and Long videos.
           </p>
         </div>
 
@@ -167,7 +184,7 @@ ${kit.pinnedComment}
                   onClick={() => handleCopy(kit.titles[selectedTitleIdx] || kit.titles[0], 'Selected Title')}
                   className="flex items-center space-x-1 text-xs text-brand-400 hover:text-brand-300 font-medium"
                 >
-                  {copiedField === 'Selected Title' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedField === 'Selected Title' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   <span>Copy Title</span>
                 </button>
               </div>
@@ -176,7 +193,8 @@ ${kit.pinnedComment}
                 {kit.titles.map((title, idx) => {
                   const isSelected = selectedTitleIdx === idx;
                   const charCount = title.length;
-                  const isSafeLength = kit.videoType === 'Short' ? charCount <= 40 : charCount <= 60;
+                  const limit = kit.videoType === 'Short' ? 40 : 60;
+                  const isSafe = charCount <= limit;
 
                   return (
                     <div
@@ -202,10 +220,10 @@ ${kit.pinnedComment}
                       <div className="flex items-center space-x-2 shrink-0">
                         <span
                           className={`text-[11px] font-mono font-bold ${
-                            isSafeLength ? 'text-emerald-400' : 'text-amber-400'
+                            isSafe ? 'text-emerald-400' : 'text-rose-400'
                           }`}
                         >
-                          {charCount} chars
+                          {charCount}/{limit}
                         </span>
                         {isSelected && <Check className="w-4 h-4 text-brand-400" />}
                       </div>
@@ -218,24 +236,73 @@ ${kit.pinnedComment}
             {/* 2. Fold-Optimized Description */}
             <div className="glass-panel p-5 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <FileText className="w-4 h-4 text-brand-400" />
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                    Fold-Optimized Description
-                  </h3>
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-brand-400" />
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Fold-Optimized Description
+                    </h3>
+                  </div>
+
+                  {/* Fold view mode toggle */}
+                  <div className="flex bg-dark-bg border border-dark-border rounded-lg p-0.5 text-[10px]">
+                    <button
+                      onClick={() => setViewFoldMode('fold')}
+                      className={`px-2 py-0.5 rounded font-medium transition ${
+                        viewFoldMode === 'fold' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Fold Breakdown
+                    </button>
+                    <button
+                      onClick={() => setViewFoldMode('full')}
+                      className={`px-2 py-0.5 rounded font-medium transition ${
+                        viewFoldMode === 'full' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Full Raw Text
+                    </button>
+                  </div>
                 </div>
+
                 <button
                   onClick={() => handleCopy(kit.description, 'Description')}
                   className="flex items-center space-x-1 text-xs text-brand-400 hover:text-brand-300 font-medium"
                 >
-                  {copiedField === 'Description' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedField === 'Description' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   <span>Copy Description</span>
                 </button>
               </div>
 
-              <div className="p-4 rounded-xl bg-dark-bg border border-dark-border font-mono text-xs text-slate-300 leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap select-text">
-                {kit.description}
-              </div>
+              {viewFoldMode === 'fold' ? (
+                <div className="space-y-3">
+                  {/* Above fold line */}
+                  <div className="p-3.5 rounded-xl bg-dark-card/90 border border-emerald-500/30 space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                      <span className="flex items-center space-x-1">
+                        <Eye className="w-3 h-3" />
+                        <span>Above The Fold (Visible before 'Show more' click)</span>
+                      </span>
+                      <span>Primary Retention Contract</span>
+                    </div>
+                    <div className="font-mono text-xs text-white leading-relaxed whitespace-pre-wrap select-text">
+                      {aboveFold}
+                    </div>
+                  </div>
+
+                  {/* Below fold */}
+                  <div className="p-3.5 rounded-xl bg-dark-bg/80 border border-dark-border text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto select-text">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">
+                      Below The Fold (Chapters, Resource Links & Hashtags):
+                    </div>
+                    {belowFold}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-dark-bg border border-dark-border font-mono text-xs text-slate-300 leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap select-text">
+                  {kit.description}
+                </div>
+              )}
             </div>
 
             {/* 3. 3-5 Hashtags + Backend Tags */}
@@ -245,11 +312,11 @@ ${kit.pinnedComment}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1.5 text-xs font-bold text-white">
                     <Hash className="w-3.5 h-3.5 text-brand-400" />
-                    <span>Hashtags (Golden 3-5 Rule)</span>
+                    <span>Hashtags ({kit.hashtags.length} Tags - Golden Limit)</span>
                   </div>
                   <button
                     onClick={() => handleCopy(kit.hashtags.join(' '), 'Hashtags')}
-                    className="text-xs text-brand-400 hover:text-brand-300"
+                    className="text-xs text-brand-400 hover:text-brand-300 font-medium"
                   >
                     Copy
                   </button>
@@ -271,16 +338,16 @@ ${kit.pinnedComment}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1.5 text-xs font-bold text-white">
                     <Tag className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Backend Tags (8-12)</span>
+                    <span>Backend Tags ({kit.backendTags.length} Tags)</span>
                   </div>
                   <button
                     onClick={() => handleCopy(kit.backendTags.join(', '), 'Backend Tags')}
-                    className="text-xs text-amber-400 hover:text-amber-300"
+                    className="text-xs text-amber-400 hover:text-amber-300 font-medium"
                   >
                     Copy
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                   {kit.backendTags.map((tag, idx) => (
                     <span
                       key={idx}
@@ -296,9 +363,17 @@ ${kit.pinnedComment}
             {/* 4. Timestamps & Pinned Comment */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="glass-panel p-4 rounded-xl space-y-2">
-                <div className="flex items-center space-x-1.5 text-xs font-bold text-white">
-                  <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Pinned Engagement Comment</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 text-xs font-bold text-white">
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Pinned Engagement Comment</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(kit.pinnedComment, 'Pinned Comment')}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Copy
+                  </button>
                 </div>
                 <p className="text-xs text-slate-300 bg-dark-bg/60 p-3 rounded-lg border border-dark-border/50 select-text">
                   "{kit.pinnedComment}"
@@ -307,9 +382,22 @@ ${kit.pinnedComment}
 
               {kit.chapters && kit.chapters.length > 0 && (
                 <div className="glass-panel p-4 rounded-xl space-y-2">
-                  <div className="flex items-center space-x-1.5 text-xs font-bold text-white">
-                    <ListOrdered className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Video Chapters</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5 text-xs font-bold text-white">
+                      <ListOrdered className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Video Chapters</span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        handleCopy(
+                          kit.chapters?.map((c) => `${c.timestamp} - ${c.title}`).join('\n') || '',
+                          'Chapters'
+                        )
+                      }
+                      className="text-xs text-emerald-400 hover:text-emerald-300"
+                    >
+                      Copy
+                    </button>
                   </div>
                   <div className="space-y-1 max-h-28 overflow-y-auto">
                     {kit.chapters.map((ch, idx) => (
@@ -359,7 +447,7 @@ ${kit.pinnedComment}
 
               <div className="w-full bg-dark-bg h-2 rounded-full overflow-hidden">
                 <div
-                  className="bg-emerald-500 h-full rounded-full"
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                   style={{ width: `${kit.seoScore}%` }}
                 />
               </div>
@@ -405,7 +493,7 @@ ${kit.pinnedComment}
           <div className="max-w-lg w-full bg-dark-surface border border-dark-border rounded-2xl shadow-2xl p-6 space-y-5">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-500">
-                <Youtube className="w-5 h-5" />
+                <Youtube className="w-4 h-4" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-white">Direct YouTube API Upload</h3>
