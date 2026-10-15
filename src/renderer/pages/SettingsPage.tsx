@@ -155,8 +155,36 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-3 text-xs">
+            <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-slate-300 leading-relaxed text-[11px] space-y-1.5">
+              <div className="flex items-center justify-between text-blue-400 font-semibold">
+                <span>Connect Real Channel vs Manual Mode:</span>
+                <button
+                  type="button"
+                  onClick={() => window.tubePilotAPI?.openExternalUrl('https://console.cloud.google.com/apis/credentials')}
+                  className="text-brand-400 hover:text-brand-300 text-[10px] flex items-center space-x-1 underline"
+                >
+                  <span>Google Cloud Console ↗</span>
+                </button>
+              </div>
+              <p className="text-slate-400">
+                • <strong>Fastest (Manual Mode):</strong> You can leave this blank! Fill out the <em>Manual Channel Profile</em> on the right with your niche, and TubePilot will generate ideas, thumbnails, and loop videos right away.
+              </p>
+              <p className="text-slate-400">
+                • <strong>To pull real YouTube analytics:</strong> Create an OAuth Client ID in Google Cloud Console with Application Type set to <em>"Desktop app"</em>, enable YouTube Data & Analytics APIs, paste the Client ID below, and click Connect.
+              </p>
+            </div>
+
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Google OAuth Client ID</label>
+              <div className="flex justify-between items-center text-slate-300 font-medium mb-1">
+                <span>Google OAuth Client ID</span>
+                <button
+                  type="button"
+                  onClick={() => window.tubePilotAPI?.openExternalUrl('https://console.cloud.google.com/apis/credentials')}
+                  className="text-brand-400 hover:text-brand-300 text-[10px]"
+                >
+                  Create in Google Cloud ↗
+                </button>
+              </div>
               <input
                 type="text"
                 value={youtubeClientId}
@@ -275,7 +303,16 @@ export const SettingsPage: React.FC = () => {
           <div className="space-y-3 pt-2 text-xs">
             {textProvider === 'claude' && (
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Anthropic Claude API Key</label>
+                <div className="flex justify-between items-center text-slate-300 font-medium mb-1">
+                  <span>Anthropic Claude API Key</span>
+                  <button
+                    type="button"
+                    onClick={() => window.tubePilotAPI?.openExternalUrl('https://console.anthropic.com/settings/keys')}
+                    className="text-brand-400 hover:text-brand-300 text-[11px] flex items-center space-x-1"
+                  >
+                    <span>Get Claude Key ↗</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type={showKeys['claude'] ? 'text' : 'password'}
@@ -296,7 +333,16 @@ export const SettingsPage: React.FC = () => {
 
             {textProvider === 'openai' && (
               <div>
-                <label className="block text-slate-300 font-medium mb-1">OpenAI API Key</label>
+                <div className="flex justify-between items-center text-slate-300 font-medium mb-1">
+                  <span>OpenAI API Key</span>
+                  <button
+                    type="button"
+                    onClick={() => window.tubePilotAPI?.openExternalUrl('https://platform.openai.com/api-keys')}
+                    className="text-brand-400 hover:text-brand-300 text-[11px] flex items-center space-x-1"
+                  >
+                    <span>Get OpenAI Key ↗</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type={showKeys['openai'] ? 'text' : 'password'}
@@ -316,8 +362,17 @@ export const SettingsPage: React.FC = () => {
             )}
 
             {textProvider === 'gemini' && (
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Google Gemini API Key</label>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-slate-300 font-medium mb-1">
+                  <span>Google Gemini API Key</span>
+                  <button
+                    type="button"
+                    onClick={() => window.tubePilotAPI?.openExternalUrl('https://aistudio.google.com/app/apikey')}
+                    className="text-emerald-400 hover:text-emerald-300 text-[11px] font-semibold flex items-center space-x-1"
+                  >
+                    <span>Get Gemini Key (Free in AI Studio) ↗</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type={showKeys['gemini'] ? 'text' : 'password'}
@@ -332,6 +387,18 @@ export const SettingsPage: React.FC = () => {
                   >
                     {showKeys['gemini'] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300/90 leading-relaxed space-y-1">
+                  <div className="font-semibold text-emerald-400">Where to get your Gemini API key:</div>
+                  <p className="text-[11px]">
+                    1. Go to <strong>Google AI Studio</strong> (aistudio.google.com).<br />
+                    2. Sign in with any Google account (personal or Google Workspace).<br />
+                    3. Click <strong>"Get API key"</strong> or <strong>"Create API key"</strong>.<br />
+                    4. Copy the generated key (starts with <code className="font-mono text-white">AIzaSy...</code>) and paste it here.
+                  </p>
+                  <p className="text-[10px] text-slate-400 pt-1">
+                    Note: Your Google One AI Premium / Gemini Advanced consumer subscription is separate from developer API access. However, Google provides a generous <strong>free tier</strong> for the Gemini API that requires no credit card.
+                  </p>
                 </div>
               </div>
             )}

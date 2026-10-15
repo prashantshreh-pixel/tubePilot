@@ -115,43 +115,66 @@ export const OnboardingModal: React.FC = () => {
 
               <div className="space-y-3">
                 <div>
-                  <div className="flex justify-between text-xs text-slate-300 mb-1">
-                    <span>Anthropic Claude API Key (Default)</span>
-                    <span className="text-slate-500 text-[10px]">Recommended</span>
+                  <div className="flex justify-between items-center text-xs text-slate-300 mb-1">
+                    <span className="font-medium">Anthropic Claude API Key (Default)</span>
+                    <button
+                      type="button"
+                      onClick={() => window.tubePilotAPI?.openExternalUrl('https://console.anthropic.com/settings/keys')}
+                      className="text-brand-400 hover:text-brand-300 text-[11px] flex items-center space-x-1"
+                    >
+                      <span>Get Claude Key ↗</span>
+                    </button>
                   </div>
                   <input
                     type="password"
                     value={anthropicApiKey}
                     onChange={(e) => setAnthropicApiKey(e.target.value)}
                     placeholder="sk-ant-..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-dark-card border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-dark-card border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-mono text-xs"
                   />
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs text-slate-300 mb-1">
-                    <span>OpenAI API Key (GPT-4o & DALL-E 3)</span>
+                  <div className="flex justify-between items-center text-xs text-slate-300 mb-1">
+                    <span className="font-medium">OpenAI API Key (GPT-4o & DALL-E 3)</span>
+                    <button
+                      type="button"
+                      onClick={() => window.tubePilotAPI?.openExternalUrl('https://platform.openai.com/api-keys')}
+                      className="text-brand-400 hover:text-brand-300 text-[11px] flex items-center space-x-1"
+                    >
+                      <span>Get OpenAI Key ↗</span>
+                    </button>
                   </div>
                   <input
                     type="password"
                     value={openaiApiKey}
                     onChange={(e) => setOpenaiApiKey(e.target.value)}
                     placeholder="sk-..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-dark-card border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-dark-card border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-mono text-xs"
                   />
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs text-slate-300 mb-1">
-                    <span>Google Gemini API Key</span>
+                  <div className="flex justify-between items-center text-xs text-slate-300 mb-1">
+                    <span className="font-medium">Google Gemini API Key</span>
+                    <button
+                      type="button"
+                      onClick={() => window.tubePilotAPI?.openExternalUrl('https://aistudio.google.com/app/apikey')}
+                      className="text-emerald-400 hover:text-emerald-300 text-[11px] font-semibold flex items-center space-x-1"
+                    >
+                      <span>Get Gemini Key (Free) ↗</span>
+                    </button>
                   </div>
                   <input
                     type="password"
                     value={geminiApiKey}
                     onChange={(e) => setGeminiApiKey(e.target.value)}
                     placeholder="AIzaSy..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-dark-card border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-dark-card border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-mono text-xs"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Visit <strong>Google AI Studio</strong> (aistudio.google.com), log in with your Google account, and click <strong>Create API Key</strong>. Generous free tier is available.
+                  </p>
                 </div>
               </div>
             </div>
