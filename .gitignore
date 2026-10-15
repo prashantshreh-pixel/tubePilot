@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-electron
+release
+*.sqlite
+*.sqlite-journal
+.env
+.DS_Store
+Thumbs.db
+TubePilot_Exports
