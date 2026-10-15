@@ -48,6 +48,14 @@ export class OpenAIProvider implements TextProvider {
       throw new Error('Empty response received from OpenAI API.');
     }
 
+    const totalTokens = data.usage?.total_tokens || 0;
+    if (totalTokens > 0) {
+      try {
+        const { dbService } = await import('../../services/db/database');
+        dbService.addTokenUsage(totalTokens);
+      } catch {}
+    }
+
     return content;
   }
 }

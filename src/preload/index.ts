@@ -20,6 +20,7 @@ export const tubePilotAPI = {
     ipcRenderer.invoke('app:getInfo'),
   openFolder: (folderPath: string): Promise<void> => ipcRenderer.invoke('app:openFolder', folderPath),
   openExternalUrl: (url: string): Promise<void> => ipcRenderer.invoke('app:openExternal', url),
+  getTotalTokens: (): Promise<number> => ipcRenderer.invoke('app:getTotalTokens'),
 
   // --- YouTube & Analytics ---
   getAnalyticsCache: (): Promise<ChannelAnalytics | null> => ipcRenderer.invoke('db:getAnalyticsCache'),

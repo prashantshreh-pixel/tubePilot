@@ -59,6 +59,9 @@ interface AppState {
   showOnboarding: boolean;
   setShowOnboarding: (show: boolean) => void;
 
+  totalTokens: number;
+  fetchTotalTokens: () => Promise<void>;
+
   // Actions
   initializeApp: () => Promise<void>;
   refreshAnalyticsData: (force?: boolean) => Promise<void>;
@@ -78,6 +81,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: null,
   analytics: null,
   quota: null,
+  totalTokens: 0,
+
+  fetchTotalTokens: async () => {
+    try {
+      const tokens = await window.tubePilotAPI?.getTotalTokens();
+      if (typeof tokens === 'number') {
+        set({ totalTokens: tokens });
+      }
+    } catch {}
+  },
 
   ideas: [],
   selectedIdea: null,
@@ -142,13 +155,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ analytics: refreshed });
       }
 
-      // Fetch ideas, thumbnails, loop videos, upload kits
-      const [ideas, thumbnails, loopVideos, uploadKits, quota] = await Promise.all([
+      // Fetch ideas, thumbnails, loop videos, upload kits, quota, total tokens
+      const [ideas, thumbnails, loopVideos, uploadKits, quota, totalTokens] = await Promise.all([
         api.getIdeas(),
         api.getThumbnails(),
         api.getLoopVideos(),
         api.getUploadKits(),
         api.getYouTubeQuota(),
+        api.getTotalTokens(),
       ]);
 
       set({
@@ -157,6 +171,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         loopVideos,
         uploadKits,
         quota,
+        totalTokens: totalTokens || 0,
         selectedIdea: ideas[0] || null,
         selectedThumbnail: thumbnails[0] || null,
         selectedLoopVideo: loopVideos[0] || null,
@@ -302,6 +317,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     const api = window.tubePilotAPI;
     if (!api) return;
 
+    // Fast cache check: if kit already loaded/cached for this idea, open immediately!
+    const existing = get().uploadKits.find((k) => k.ideaId === idea.id);
+    if (existing) {
+      set({
+        selectedIdea: idea,
+        selectedUploadKit: existing,
+        currentPage: 'upload-kits',
+      });
+      get().addToast('info', 'Loaded cached upload kit instantly.');
+      return;
+    }
+
     try {
       set({ selectedIdea: idea });
       get().setLoading(true, 'Optimizing titles, description, hashtags and tags...');
@@ -311,6 +338,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         selectedUploadKit: kit,
         currentPage: 'upload-kits',
       }));
+      await get().fetchTotalTokens();
       get().addToast('success', 'Upload kit ready to copy-paste!');
     } catch (err: any) {
       get().addToast('error', `Upload kit failed: ${err.message}`);

@@ -46,6 +46,14 @@ export class ClaudeProvider implements TextProvider {
       throw new Error('Empty response received from Claude API.');
     }
 
+    const totalTokens = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
+    if (totalTokens > 0) {
+      try {
+        const { dbService } = await import('../../services/db/database');
+        dbService.addTokenUsage(totalTokens);
+      } catch {}
+    }
+
     return content;
   }
 }

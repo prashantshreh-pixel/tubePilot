@@ -295,6 +295,29 @@ export class DatabaseService {
     return merged;
   }
 
+  // --- TOKEN USAGE TRACKING ---
+  public addTokenUsage(tokens: number): number {
+    if (!this.db || !tokens) return this.getTotalTokens();
+    const current = this.getTotalTokens();
+    const updated = current + Math.round(tokens);
+    const stmt = this.db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('total_tokens_used', ?);`);
+    stmt.run([String(updated)]);
+    stmt.free();
+    this.scheduleSave();
+    return updated;
+  }
+
+  public getTotalTokens(): number {
+    if (!this.db) return 0;
+    try {
+      const res = this.db.exec(`SELECT value FROM settings WHERE key = 'total_tokens_used'`);
+      if (res.length > 0 && res[0].values.length > 0) {
+        return parseInt(res[0].values[0][0] as string, 10) || 0;
+      }
+    } catch {}
+    return 0;
+  }
+
   // --- ANALYTICS CACHE ---
   public getAnalyticsCache(): ChannelAnalytics | null {
     if (!this.db) return null;

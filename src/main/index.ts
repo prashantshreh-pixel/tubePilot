@@ -22,6 +22,7 @@ async function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      webSecurity: false,
     },
     show: false,
   });
@@ -79,6 +80,10 @@ function setupIpcHandlers() {
     if (url) {
       shell.openExternal(url);
     }
+  });
+
+  ipcMain.handle('app:getTotalTokens', () => {
+    return dbService.getTotalTokens();
   });
 
   // Settings

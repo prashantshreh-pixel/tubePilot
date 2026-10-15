@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, FolderOpen, Sparkles, AlertCircle } from 'lucide-react';
+import { RefreshCw, FolderOpen, Sparkles, AlertCircle, Zap } from 'lucide-react';
 import { useAppStore, PageId } from '../store/useAppStore';
 
 const TITLES: Record<PageId, { title: string; subtitle: string }> = {
@@ -13,7 +13,7 @@ const TITLES: Record<PageId, { title: string; subtitle: string }> = {
 };
 
 export const Header: React.FC = () => {
-  const { currentPage, refreshAnalyticsData, generateNewIdeas, isLoading, quota, settings } = useAppStore();
+  const { currentPage, refreshAnalyticsData, generateNewIdeas, isLoading, quota, settings, totalTokens } = useAppStore();
   const info = TITLES[currentPage] || TITLES.dashboard;
 
   const handleOpenFolder = () => {
@@ -37,9 +37,19 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center space-x-3">
+        {/* Total Tokens Used Badge */}
+        <div
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300 font-medium shadow-sm"
+          title="Total AI tokens consumed across prompt generation and diagnosis"
+        >
+          <Zap className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />
+          <span className="text-slate-400">Tokens:</span>
+          <span className="font-bold text-white font-mono">{totalTokens.toLocaleString()}</span>
+        </div>
+
         {/* Quota Counter */}
         {quota && (
-          <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-dark-card border border-dark-border text-xs text-slate-300">
+          <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-dark-card border border-dark-border text-xs text-slate-300">
             <span className="w-2 h-2 rounded-full bg-brand-500" />
             <span className="text-slate-400">Quota:</span>
             <span className="font-semibold text-white">{quota.estimatedUsed}</span>

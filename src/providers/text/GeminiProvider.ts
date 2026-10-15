@@ -33,80 +33,102 @@ export class GeminiProvider implements TextProvider {
 
     for (let i = 0; i < candidateModels.length; i++) {
       const currentModel = candidateModels[i];
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
 
-        // 8-second timeout per attempt to guarantee fast response
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+      // Try up to 3 times per model on transient errors (503 High Demand, 429 Rate Limit)
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: systemPrompt }],
+          // 8-second timeout per attempt to guarantee fast response
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: userPrompt }],
+            signal: controller.signal,
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: systemPrompt }],
               },
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1200,
-            },
-          }),
-        });
-        clearTimeout(timeoutId);
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: userPrompt }],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 1200,
+              },
+            }),
+          });
+          clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          let parsedMessage = errorText;
-          try {
-            const errObj = JSON.parse(errorText);
-            if (errObj.error?.message) {
-              parsedMessage = errObj.error.message;
+          if (!response.ok) {
+            const errorText = await response.text();
+            let parsedMessage = errorText;
+            try {
+              const errObj = JSON.parse(errorText);
+              if (errObj.error?.message) {
+                parsedMessage = errObj.error.message;
+              }
+            } catch {
+              // Keep errorText
             }
-          } catch {
-            // Keep errorText
+
+            // If 503 (high demand) or 429 (rate limit), retry up to 3 times with backoff
+            if ((response.status === 503 || response.status === 429) && attempt < 3) {
+              console.warn(`[GeminiProvider] ${currentModel} returned ${response.status} (attempt ${attempt}/3). Retrying in ${attempt * 600}ms...`);
+              await new Promise((resolve) => setTimeout(resolve, attempt * 600));
+              continue;
+            }
+
+            // If model is 404 (not found) or 503 persisted after 3 attempts, try next fallback model
+            if ((response.status === 404 || response.status === 503) && i < candidateModels.length - 1) {
+              console.warn(`[GeminiProvider] Model ${currentModel} returned ${response.status} (${parsedMessage}). Switching to fallback model ${candidateModels[i + 1]}...`);
+              break; // breaks inner attempt loop to try next model
+            }
+
+            throw new Error(`Gemini API request failed [${response.status}] for ${currentModel}: ${parsedMessage}`);
           }
 
-          // If the model was not found / deprecated (404), try next model in fallback list
-          if (response.status === 404 && i < candidateModels.length - 1) {
-            console.warn(`[GeminiProvider] Model ${currentModel} returned 404 (${parsedMessage}). Trying fallback model ${candidateModels[i + 1]}...`);
+          const data = await response.json();
+          const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!candidate) {
+            throw new Error(`Empty response received from Gemini API (${currentModel}).`);
+          }
+
+          // Track tokens used
+          const totalTokens = data.usageMetadata?.totalTokenCount || Math.round((userPrompt.length + candidate.length) / 3.5);
+          try {
+            const { dbService } = await import('../../services/db/database');
+            dbService.addTokenUsage(totalTokens);
+          } catch {}
+
+          // Cache working model so subsequent calls bypass trial models
+          GeminiProvider.cachedWorkingModel = currentModel;
+          this.model = currentModel;
+
+          return candidate;
+        } catch (err: any) {
+          lastError = err;
+          // If aborted/timeout or network error, retry attempt or next model
+          if (attempt < 3 && err.name !== 'AbortError') {
+            await new Promise((resolve) => setTimeout(resolve, attempt * 500));
             continue;
           }
-
-          throw new Error(`Gemini API request failed [${response.status}] for ${currentModel}: ${parsedMessage}`);
+          if (i < candidateModels.length - 1) {
+            break; // Try next model
+          }
+          throw err;
         }
-
-        const data = await response.json();
-        const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!candidate) {
-          throw new Error(`Empty response received from Gemini API (${currentModel}).`);
-        }
-
-        // Cache working model so subsequent calls bypass trial models
-        GeminiProvider.cachedWorkingModel = currentModel;
-        this.model = currentModel;
-
-        return candidate;
-      } catch (err: any) {
-        lastError = err;
-        // If aborted/timeout or 404 and there are more candidates, try next
-        if ((err.name === 'AbortError' || err.message?.includes('404')) && i < candidateModels.length - 1) {
-          continue;
-        }
-        throw err;
       }
     }
 
-    throw lastError || new Error('Failed to generate text with Google Gemini API.');
+    throw lastError || new Error('Failed to generate text with Google Gemini API after retrying.');
   }
 }
 
