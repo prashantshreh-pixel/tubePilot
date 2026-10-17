@@ -78,36 +78,14 @@ export class FFmpegService {
     const fps = 25;
     const totalFrames = halfDuration * fps;
 
-    // Build filter complex
-    // 1. Zoompan Ken Burns effect (slow zoom in from 1.0 to 1.15)
-    // 2. Ping-pong seamless loop: split forward stream, reverse 2nd stream, concat both
-    // 3. Ambient lo-fi chord sound generator crossfaded seamlessly
-    let filterComplex = '';
-
-    if (loopTechnique === 'seamless_crossfade') {
-      // Crossfade technique
-      const fadeDuration = 1.0;
-      const baseDuration = durationSeconds + fadeDuration;
-      const baseFrames = baseDuration * fps;
-
-      filterComplex = `
-        [0:v]scale=-2:${height * 2},
-        zoompan=z='min(zoom+0.0006,1.20)':d=${baseFrames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${width}x${height}:fps=${fps}[base];
-        [base]split[main][fade];
-        [fade]trim=start=0:end=${fadeDuration},setpts=PTS-STARTPTS[f_start];
-        [main]trim=start=${fadeDuration}:end=${baseDuration},setpts=PTS-STARTPTS[f_rest];
-        [f_rest][f_start]xfade=transition=fade:duration=${fadeDuration}:offset=${durationSeconds - fadeDuration}[v_out]
-      `.replace(/\s+/g, ' ');
-    } else {
-      // Default: forward_reverse_pingpong (100% mathematically seamless without any cuts or pops)
-      filterComplex = `
-        [0:v]scale=-2:${height * 2},
-        zoompan=z='min(zoom+0.0008,1.22)':d=${totalFrames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${width}x${height}:fps=${fps}[fwd];
-        [fwd]split[v1][v2];
-        [v2]reverse[rev];
-        [v1][rev]concat=n=2:v=1:a=0[v_out]
-      `.replace(/\s+/g, ' ');
-    }
+    // Build filter complex:
+    // Locked static camera: NO zoom, NO push-in, NO pan, NO shake, NO cuts.
+    // Subtle cyclical ambient breathing where last frame matches first frame mathematically.
+    let filterComplex = `
+      [0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,
+      crop=${width}:${height},
+      eq=brightness='0.018*sin(2*PI*t/${durationSeconds})':contrast=1.02[v_out]
+    `.replace(/\s+/g, ' ');
 
     // Audio arguments: synthesizes a warm, lo-fi ambient pad crossfaded seamlessly
     const audioArgs: string[] = [];

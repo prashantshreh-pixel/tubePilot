@@ -199,7 +199,7 @@ export interface UploadKitData {
 export interface AppSettings {
   // AI Providers
   textProvider: 'claude' | 'openai' | 'gemini';
-  imageProvider: 'openai' | 'stability' | 'replicate';
+  imageProvider: 'gemini' | 'openai' | 'stability' | 'replicate';
   videoProvider: 'local_ffmpeg' | 'runway' | 'luma' | 'replicate' | 'kling';
 
   // API Keys (Encrypted)

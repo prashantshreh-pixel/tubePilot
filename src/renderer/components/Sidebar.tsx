@@ -27,7 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'thumbnails', label: 'Thumbnails', icon: Image },
   { id: 'loop-videos', label: 'Loop Videos', icon: Repeat },
   { id: 'upload-kits', label: 'Upload Kits', icon: UploadCloud },
-  { id: 'library', label: 'Library', icon: FolderArchive },
+  { id: 'library', label: 'Showcase & Library', icon: FolderArchive, badge: 'All' },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

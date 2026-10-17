@@ -185,7 +185,7 @@ export const LoopVideosPage: React.FC = () => {
                 {loop.videoPath ? (
                   <video
                     ref={videoRef}
-                    src={`file://${loop.videoPath}`}
+                    src={loop.videoPath ? (loop.videoPath.startsWith('http') ? loop.videoPath : `file:///${loop.videoPath.replace(/\\/g, '/')}`) : ''}
                     controls
                     autoPlay
                     loop

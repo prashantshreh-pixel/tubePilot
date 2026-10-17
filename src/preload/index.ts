@@ -56,6 +56,17 @@ export const tubePilotAPI = {
     customOverlay?: string
   ): Promise<{ filePath: string }> =>
     ipcRenderer.invoke('ai:exportThumbnail', thumbnailId, variationIndex, customOverlay),
+  saveThumbnail: (thumbnail: ThumbnailData): Promise<void> =>
+    ipcRenderer.invoke('db:saveThumbnail', thumbnail),
+  openGeminiWebStudio: (params: { thumbnailId: string; prompt: string }): Promise<void> =>
+    ipcRenderer.invoke('geminiWeb:openStudio', params),
+  grabGeminiWebImage: (): Promise<{ success: boolean; message: string }> =>
+    ipcRenderer.invoke('geminiWeb:grabImage'),
+  onThumbnailUpdated: (callback: (thumbnail: ThumbnailData) => void) => {
+    const handler = (_: any, thumbnail: ThumbnailData) => callback(thumbnail);
+    ipcRenderer.on('thumbnail:updated', handler);
+    return () => ipcRenderer.removeListener('thumbnail:updated', handler);
+  },
 
   // --- Loop Videos ---
   getLoopVideos: (ideaId?: string): Promise<LoopVideoData[]> =>

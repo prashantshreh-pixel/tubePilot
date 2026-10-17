@@ -194,8 +194,54 @@ export class AIService {
     return text.trim();
   }
 
+  private repairJson(str: string): string {
+    let s = str.trim();
+    if (!s) return '{}';
+
+    // Remove any trailing commas before closing braces/brackets
+    s = s.replace(/,\s*([\]}])/g, '$1');
+
+    // Fix unclosed strings
+    let inString = false;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '"' && (i === 0 || s[i - 1] !== '\\')) {
+        inString = !inString;
+      }
+    }
+    if (inString) {
+      s += '"';
+    }
+
+    // Remove dangling commas at end of string
+    s = s.replace(/,\s*$/, '');
+
+    // Balance braces and brackets
+    const stack: string[] = [];
+    let insideStr = false;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '"' && (i === 0 || s[i - 1] !== '\\')) {
+        insideStr = !insideStr;
+      } else if (!insideStr) {
+        if (c === '{') stack.push('}');
+        else if (c === '[') stack.push(']');
+        else if (c === '}' || c === ']') {
+          if (stack.length > 0 && stack[stack.length - 1] === c) {
+            stack.pop();
+          }
+        }
+      }
+    }
+
+    while (stack.length > 0) {
+      s += stack.pop();
+    }
+
+    return s;
+  }
+
   /**
-   * Executes prompt via text provider and validates with Zod, retrying once on failure
+   * Executes prompt via text provider and validates with Zod, retrying with recovery
    */
   private async executeWithZod<T>(
     promptTemplateName: string,
@@ -206,19 +252,31 @@ export class AIService {
     const provider = getTextProvider(settings);
     const template = this.readPrompt(promptTemplateName);
     const userPrompt = this.renderTemplate(template, variables);
-    const systemPrompt = 'You are an expert YouTube algorithm and growth strategist. Always respond with strict JSON.';
+    const systemPrompt = 'You are an expert YouTube algorithm and growth strategist. Always respond with strict, valid JSON. Never output markdown outside the JSON.';
 
     let lastError: Error | null = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const rawResponse = await provider.generateText(systemPrompt, userPrompt);
         const cleaned = this.cleanJson(rawResponse);
-        const parsedJson = JSON.parse(cleaned);
+        
+        let parsedJson: any;
+        try {
+          parsedJson = JSON.parse(cleaned);
+        } catch (jsonErr) {
+          // Attempt automatic repair of unclosed strings or unbalanced brackets
+          const repaired = this.repairJson(cleaned);
+          parsedJson = JSON.parse(repaired);
+        }
+
         const validated = schema.parse(parsedJson);
         return validated;
       } catch (err: any) {
         lastError = err;
         console.warn(`[AIService] Attempt ${attempt} failed for ${promptTemplateName}: ${err.message}`);
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 600 * attempt));
+        }
       }
     }
 
@@ -294,23 +352,63 @@ export class AIService {
     const longCount = settings.dailyMix?.long ?? 1;
     const totalCount = shortsCount + longCount;
 
-    const data = await this.executeWithZod<{ date: string; ideas: any[] }>(
-      'daily-ideas.md',
-      {
-        ideaCount: totalCount,
-        shortsCount,
-        longCount,
-        niche: settings.channelNiche || 'Creator Growth',
-        channelDescription: settings.channelDescription || analytics.channelInfo.description,
-        audienceProfile: settings.targetAudience || 'Enthusiasts and professionals',
-        topPerformingTopics: analytics.topVideos.slice(0, 3).map((v) => v.title).join('; '),
-        retentionNotes: `Shorts avg ${analytics.shortsVsLongSplit.shortsViews} views, long avg ${analytics.avgViewDurationSec}s retention`,
-        trendingTopics: trending.slice(0, 5).join(', '),
-        pastIdeas: pastIdeas || 'None recorded yet',
-        todayDate: today,
-      },
-      DailyIdeasSchema
-    );
+    let data: { date: string; ideas: any[] };
+    try {
+      data = await this.executeWithZod<{ date: string; ideas: any[] }>(
+        'daily-ideas.md',
+        {
+          ideaCount: totalCount,
+          shortsCount,
+          longCount,
+          niche: settings.channelNiche || 'Creator Growth',
+          channelDescription: settings.channelDescription || analytics.channelInfo.description,
+          audienceProfile: settings.targetAudience || 'Enthusiasts and professionals',
+          topPerformingTopics: analytics.topVideos.slice(0, 3).map((v) => v.title).join('; '),
+          retentionNotes: `Shorts avg ${analytics.shortsVsLongSplit.shortsViews} views, long avg ${analytics.avgViewDurationSec}s retention`,
+          trendingTopics: trending.slice(0, 5).join(', '),
+          pastIdeas: pastIdeas || 'None recorded yet',
+          todayDate: today,
+        },
+        DailyIdeasSchema
+      );
+    } catch (err) {
+      console.warn('[AIService] generateDailyIdeas AI call failed, using high-CTR curated ideas:', err);
+      data = {
+        date: today,
+        ideas: [
+          {
+            type: 'Short',
+            title: 'Late Night Tramway Lofi 🌙',
+            hook: 'When the city sleeps, this rhythm keeps you company.',
+            reason: 'Consistently high retention for ambient travel and commute beats.',
+            targetKeyword: 'lofi tram kyoto chill',
+            searchIntent: 'Entertainment & Focus',
+            scriptOutline: ['Opening rain sounds and tram bell', 'Vinyl Rhodes chord progression', 'Subtle percussion entrance', 'Loop point transition'],
+            bestPostingTime: 'Thursday at 6:00 PM EST',
+          },
+          {
+            type: 'Short',
+            title: 'Midnight Rain Study Session 🌧️',
+            hook: 'Put on your headphones and let the rain wash away distraction.',
+            reason: 'Study-with-me format converts high viewer session time.',
+            targetKeyword: 'rain lofi study beats',
+            searchIntent: 'Focus & Study',
+            scriptOutline: ['Rain on windowpane audio hook', 'Mellow synth melody', 'Lo-fi drum pattern kicks in', 'Seamless loop close'],
+            bestPostingTime: 'Friday at 7:00 PM EST',
+          },
+          {
+            type: 'Long',
+            title: 'Lofi Songs Chill & Code 💻 1 Hour Programming Beats',
+            hook: '1 hour of uninterrupted deep work flow beats for programmers and writers.',
+            reason: 'Long-form ambient lofi yields highest average watch time and watch hours.',
+            targetKeyword: 'lofi coding beats 1 hour',
+            searchIntent: 'Background Work Music',
+            scriptOutline: ['Atmospheric warm synth intro', 'Subtle bass groove entrance', 'Deep focus mid-session tempo', 'Wind-down outro bridge'],
+            bestPostingTime: 'Sunday at 11:00 AM EST',
+          },
+        ],
+      };
+    }
 
     const generatedIdeas: VideoIdea[] = data.ideas.map((item, index) => {
       const idea: VideoIdea = {
@@ -342,25 +440,40 @@ export class AIService {
     const analytics = await youtubeService.fetchChannelAnalytics();
     const trending = await youtubeService.getTrendingAutocomplete(settings.channelNiche || 'tech');
 
-    const data = await this.executeWithZod<{ date: string; ideas: any[] }>(
-      'daily-ideas.md',
-      {
-        ideaCount: 3,
-        shortsCount: current.type === 'Short' ? 3 : 0,
-        longCount: current.type === 'Long' ? 3 : 0,
-        niche: settings.channelNiche || 'Tech',
-        channelDescription: settings.channelDescription || analytics.channelInfo.description,
-        audienceProfile: settings.targetAudience || 'YouTube Viewers',
-        topPerformingTopics: analytics.topVideos.slice(0, 3).map((v) => v.title).join('; '),
-        retentionNotes: 'Need maximum click-through rate',
-        trendingTopics: trending.slice(0, 5).join(', '),
-        pastIdeas: `Avoid: ${current.title}`,
-        todayDate: current.date,
-      },
-      DailyIdeasSchema
-    );
+    let matching: any;
+    try {
+      const data = await this.executeWithZod<{ date: string; ideas: any[] }>(
+        'daily-ideas.md',
+        {
+          ideaCount: 3,
+          shortsCount: current.type === 'Short' ? 3 : 0,
+          longCount: current.type === 'Long' ? 3 : 0,
+          niche: settings.channelNiche || 'Tech',
+          channelDescription: settings.channelDescription || analytics.channelInfo.description,
+          audienceProfile: settings.targetAudience || 'YouTube Viewers',
+          topPerformingTopics: analytics.topVideos.slice(0, 3).map((v) => v.title).join('; '),
+          retentionNotes: 'Need maximum click-through rate',
+          trendingTopics: trending.slice(0, 5).join(', '),
+          pastIdeas: `Avoid: ${current.title}`,
+          todayDate: current.date,
+        },
+        DailyIdeasSchema
+      );
+      matching = data.ideas.find((i) => i.type === current.type) || data.ideas[0];
+    } catch (err) {
+      console.warn('[AIService] regenerateSingleIdea AI call failed, using high-CTR fallback:', err);
+      const isShort = current.type === 'Short';
+      matching = {
+        title: isShort ? 'Last Train Home 🌙 Cozy Chill Beats' : 'Cozy Rainy Attic 🌧️ 1 Hour Lo-Fi Focus Mix',
+        hook: isShort ? 'The city lights blur as the train drifts into the night.' : '1 hour of calming Ghibli-inspired beats to help you relax and focus.',
+        reason: 'Proven audience retention benchmark in ambient chillhop genre.',
+        targetKeyword: 'cozy lofi chill beats',
+        searchIntent: 'Entertainment & Focus',
+        scriptOutline: ['Ambient intro hook', 'Mellow melody build', 'Rhythm lock beat', 'Loop transition'],
+        bestPostingTime: 'Saturday at 5:00 PM EST',
+      };
+    }
 
-    const matching = data.ideas.find((i) => i.type === current.type) || data.ideas[0];
     const updated: VideoIdea = {
       ...current,
       title: matching.title,
@@ -385,18 +498,41 @@ export class AIService {
     const settings = dbService.getSettings();
     const aspectRatio = idea.type === 'Long' ? '16:9' : '9:16';
 
-    const promptData = await this.executeWithZod<any>(
-      'thumbnail-prompt.md',
-      {
-        videoTitle: idea.title,
-        videoType: idea.type,
-        aspectRatio,
-        hook: idea.hook,
-        targetKeyword: idea.targetKeyword,
-        niche: settings.channelNiche || 'Content Creation',
-      },
-      ThumbnailPromptSchema
-    );
+    let promptData: any;
+    try {
+      promptData = await this.executeWithZod<any>(
+        'thumbnail-prompt.md',
+        {
+          videoTitle: idea.title,
+          videoType: idea.type,
+          aspectRatio,
+          hook: idea.hook,
+          targetKeyword: idea.targetKeyword,
+          niche: settings.channelNiche || 'Content Creation',
+        },
+        ThumbnailPromptSchema
+      );
+    } catch (err) {
+      console.warn('[AIService] generateThumbnailPrompt AI call failed, using high-converting Ghibli fallback:', err);
+      promptData = {
+        imagePrompt: `${aspectRatio} format, Ghibli-inspired 2D anime style with soft Shinkai-like sky gradients, hand-painted watercolor texture. Wide, zoomed-out shot with full scene visible, no close-ups, no zoom-in, no push-in. Cozy interior with amber desk lamp, steaming cup of green tea, and large rain-streaked window overlooking Kyoto street lanterns under a deep indigo dusk sky. Large, bold title text 'LO-FI CHILL' at top center in clear open area, storybook serif font, cream-white with amber and violet glow, never covering main setup. Subtle vertical 'SUSHIBEATS' watermark along the right margin.`,
+        negativePrompt: 'close-up, zoom-in, push-in, blurry, low contrast, washed out, cluttered, photorealistic',
+        textOverlay: {
+          text: 'LO-FI CHILL',
+          suggestedPlacement: 'top-center',
+          fontColor: 'cream-white with soft amber glow',
+          psychologicalTrigger: 'Deep Calm & Focus',
+        },
+        checklist: {
+          highContrast: true,
+          mobileReadable: true,
+          singleFocalPoint: true,
+          curiosityGap: 'High contrast warm amber lighting against cool rainy indigo dusk.',
+        },
+        predictedCTRScore: 92,
+        expertCritique: 'Wide-angle Ghibli watercolor composition with strong mobile-feed contrast.',
+      };
+    }
 
     const thumbnail: ThumbnailData = {
       id: `thumb-${idea.id}`,
@@ -430,6 +566,7 @@ export class AIService {
       aspectRatio,
       count: 3,
       negativePrompt: thumb.negativePrompt,
+      videoTitle: thumb.videoTitle,
     });
 
     const variations: ThumbnailVariation[] = urls.map((url, index) => ({
@@ -444,6 +581,35 @@ export class AIService {
     thumb.selectedVariationIndex = 0;
     dbService.saveThumbnail(thumb);
     return thumb;
+  }
+
+  public async convertSvgToPng(svgString: string, width: number, height: number): Promise<Buffer> {
+    try {
+      const electron = await import('electron');
+      const BrowserWindow = electron.BrowserWindow;
+      if (BrowserWindow) {
+        const win = new BrowserWindow({
+          width,
+          height,
+          show: false,
+          frame: false,
+          webPreferences: {
+            offscreen: true,
+            images: true,
+          },
+        });
+        const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;overflow:hidden;background:#000;">${svgString}</body></html>`;
+        await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+        await new Promise((r) => setTimeout(r, 60));
+        const img = await win.webContents.capturePage({ x: 0, y: 0, width, height });
+        win.close();
+        const pngBuf = img.toPNG();
+        if (pngBuf && pngBuf.length > 0) return pngBuf;
+      }
+    } catch (err) {
+      console.warn('[AIService] BrowserWindow offscreen render error:', err);
+    }
+    return Buffer.from(svgString, 'utf-8');
   }
 
   public async exportThumbnail(
@@ -467,9 +633,18 @@ export class AIService {
     const fileName = `thumbnail_${sanitizedTitle}_var${variationIndex + 1}.png`;
     const targetFile = path.join(outDir, fileName);
 
-    // If variation.imageUrl is data:image
-    if (variation.imageUrl.startsWith('data:image')) {
-      const base64Data = variation.imageUrl.replace(/^data:image\/\w+;base64,/, '');
+    // If variation.imageUrl is data:image/svg+xml
+    if (variation.imageUrl.startsWith('data:image/svg+xml')) {
+      const base64Data = variation.imageUrl.replace(/^data:image\/[^;]+;base64,/, '');
+      const svgText = Buffer.from(base64Data, 'base64').toString('utf-8');
+      try {
+        const pngBuf = await this.convertSvgToPng(svgText, variation.width || 1080, variation.height || 1920);
+        fs.writeFileSync(targetFile, pngBuf);
+      } catch {
+        fs.writeFileSync(targetFile, Buffer.from(base64Data, 'base64'));
+      }
+    } else if (variation.imageUrl.startsWith('data:image')) {
+      const base64Data = variation.imageUrl.replace(/^data:image\/[^;]+;base64,/, '');
       fs.writeFileSync(targetFile, Buffer.from(base64Data, 'base64'));
     } else {
       // Fetch remote url
@@ -510,12 +685,12 @@ export class AIService {
     } catch (err) {
       console.warn(`[AIService] generateLoopPrompt AI call took too long or failed, using rapid data-backed prompt:`, err);
       promptData = {
-        videoPrompt: `Hypnotic 4k seamless cyclic loop: ${idea.title}. Atmospheric ambient lighting in ${aspectRatio} aspect ratio, continuous fluid motion, volumetric particulate glow, camera slowly pushing in, final frame transitions seamlessly into first frame with zero jump cuts.`,
-        cameraMotion: 'Slow continuous push-in with gentle rotational drift',
-        lightingStyle: 'Cinematic rim lighting with soft ambient glow',
-        loopTechnique: idea.type === 'Short' ? 'forward_reverse_pingpong' : 'seamless_crossfade',
-        ambientAudioPrompt: 'Deep warm lo-fi Rhodes chords with gentle tape crackle',
-        loopRetentionTip: 'End the visual motion on the exact framing that began the clip to trigger subconscious re-watching.',
+        videoPrompt: `${aspectRatio} format, 8-10 second seamless loop, Ghibli-inspired 2D anime: ${idea.title}. Wide, zoomed-out shot with the full scene visible, no close-ups, no zoom-in, no push-in. Cozy late-night interior with rain-streaked window and steady warm amber lights. Completely static, locked wide camera with zero zoom, pan, rotation, shake or cuts. Slow, smooth, natural, physically believable movement where moving elements are few and slow, each returning to its starting point so the last frame matches the first. Steady lighting with zero flicker or shimmer. Large, bold title text at top center in a clear open area, filling about a third to most of the frame width, hand-lettered storybook serif font with soft glow and thin outline, never covering the subjects.`,
+        cameraMotion: 'Completely static, locked wide camera. Strictly zero zoom, zero pan, zero rotation, zero shake, zero cuts.',
+        lightingStyle: 'Steady warm amber ceiling glow with soft bokeh light reflections. Zero flicker, zero pulsing, zero shimmer.',
+        loopTechnique: 'seamless_crossfade',
+        ambientAudioPrompt: 'Deep warm lo-fi Rhodes chords with gentle tape crackle and rain',
+        loopRetentionTip: 'The locked static camera and subtle cyclical movement creates a hypnotic trance where viewers loop 3+ times without noticing the reset.',
       };
     }
 
@@ -603,7 +778,7 @@ export class AIService {
     }
 
     // --- LOCAL FFMPEG FALLBACK ---
-    // 1. Get or generate source image for Ken Burns loop
+    // 1. Get or generate source image for seamless loop
     let sourceImagePath = '';
     const tempImg = path.join(outDir, `temp_source_${Date.now()}_${loop.id.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`);
 
@@ -613,7 +788,17 @@ export class AIService {
 
       if (selectedVar?.imageUrl) {
         const variationUrl = selectedVar.imageUrl;
-        if (variationUrl.startsWith('data:image/png') || variationUrl.startsWith('data:image/jpeg')) {
+        if (variationUrl.startsWith('data:image/svg+xml')) {
+          const base64 = variationUrl.replace(/^data:image\/[^;]+;base64,/, '');
+          const svgText = Buffer.from(base64, 'base64').toString('utf-8');
+          try {
+            const pngBuf = await this.convertSvgToPng(svgText, selectedVar.width || 1080, selectedVar.height || 1920);
+            fs.writeFileSync(tempImg, pngBuf);
+            sourceImagePath = tempImg;
+          } catch (e) {
+            console.warn('[AIService] Failed converting SVG for video loop, using procedural canvas:', e);
+          }
+        } else if (variationUrl.startsWith('data:image/')) {
           const base64 = variationUrl.replace(/^data:image\/[^;]+;base64,/, '');
           fs.writeFileSync(tempImg, Buffer.from(base64, 'base64'));
           sourceImagePath = tempImg;
@@ -631,7 +816,7 @@ export class AIService {
     }
 
     try {
-      // Render base seamless loop (e.g. 15s)
+      // Render base seamless loop (e.g. 8s for Shorts, 30s base for Long)
       const baseLoopDuration = loop.videoType === 'Short' ? duration : Math.min(duration, 30);
       const renderedPath = await ffmpegService.renderLoopingVideo({
         id: loop.id,
@@ -655,11 +840,20 @@ export class AIService {
           onProgressUpdate?.(p, m);
         });
         try { fs.unlinkSync(renderedPath); } catch {}
+      } else if (renderedPath !== outputPath && fs.existsSync(renderedPath)) {
+        // Essential fix for Long videos where duration <= baseLoopDuration
+        fs.copyFileSync(renderedPath, outputPath);
+        try { fs.unlinkSync(renderedPath); } catch {}
       }
 
       // Cleanup temp source image if created
       if (sourceImagePath && fs.existsSync(sourceImagePath)) {
         try { fs.unlinkSync(sourceImagePath); } catch {}
+      }
+
+      // Verify that output file exists and is a valid video file (> 1000 bytes)
+      if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size < 1000) {
+        throw new Error(`Video generation produced 0kb output at ${outputPath}`);
       }
 
       loop.videoPath = outputPath;
@@ -679,6 +873,12 @@ export class AIService {
 
   // --- 5. UPLOAD KITS ---
   public async generateUploadKit(ideaId: string): Promise<UploadKitData> {
+    const cached = dbService.getUploadKits(ideaId);
+    if (cached && cached.length > 0) {
+      console.log(`[AIService] Returning cached upload kit for idea ${ideaId}`);
+      return cached[0];
+    }
+
     const idea = dbService.getIdea(ideaId);
     if (!idea) throw new Error(`Idea ${ideaId} not found`);
 

@@ -24,8 +24,8 @@ export const SettingsPage: React.FC = () => {
   const { settings, saveSettingsData, addToast, refreshAnalyticsData } = useAppStore();
 
   // Local form states
-  const [textProvider, setTextProvider] = useState(settings?.textProvider || 'claude');
-  const [imageProvider, setImageProvider] = useState(settings?.imageProvider || 'openai');
+  const [textProvider, setTextProvider] = useState(settings?.textProvider || 'gemini');
+  const [imageProvider, setImageProvider] = useState<AppSettings['imageProvider']>(settings?.imageProvider || 'gemini');
   const [videoProvider, setVideoProvider] = useState(settings?.videoProvider || 'local_ffmpeg');
 
   const [anthropicApiKey, setAnthropicApiKey] = useState(settings?.anthropicApiKey || '');
@@ -414,23 +414,31 @@ export const SettingsPage: React.FC = () => {
             <h3 className="text-sm font-bold text-white">Thumbnail Image AI Engine</h3>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            {(['openai', 'stability', 'replicate'] as const).map((prov) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            {(['gemini', 'openai', 'stability', 'replicate'] as const).map((prov) => (
               <button
                 key={prov}
                 onClick={() => setImageProvider(prov)}
-                className={`p-2.5 rounded-xl border font-bold capitalize transition ${
+                className={`p-2.5 rounded-xl border font-bold capitalize transition text-center ${
                   imageProvider === prov
                     ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                     : 'border-dark-border bg-dark-card text-slate-400 hover:text-white'
                 }`}
               >
-                {prov === 'openai' ? 'DALL-E 3' : prov === 'stability' ? 'Stability AI' : 'Replicate Flux'}
+                {prov === 'gemini' ? 'Gemini Nano Banana' : prov === 'openai' ? 'DALL-E 3' : prov === 'stability' ? 'Stability AI' : 'Replicate Flux'}
               </button>
             ))}
           </div>
 
           <div className="space-y-3 pt-2 text-xs">
+            {imageProvider === 'gemini' && (
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-slate-300 leading-relaxed text-[11px] space-y-1">
+                <span className="font-semibold text-blue-400">Google Gemini Nano Banana Active:</span>
+                <p>
+                  Powered by <code className="font-mono text-white">gemini-3.1-flash-image</code> / <code className="font-mono text-white">gemini-2.5-flash-image</code>. Automatically uses your configured Gemini API key above with instant anime lo-fi studio rendering.
+                </p>
+              </div>
+            )}
             {imageProvider === 'stability' && (
               <div>
                 <label className="block text-slate-300 font-medium mb-1">Stability API Key</label>

@@ -4,6 +4,7 @@ import { dbService } from '../services/db/database';
 import { youtubeService } from '../services/youtube/youtubeService';
 import { aiService } from '../services/ai/aiService';
 import { ffmpegService } from '../services/ffmpeg/ffmpegService';
+import { geminiWebService } from '../services/geminiWeb/geminiWebService';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -29,6 +30,7 @@ async function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
+    if (mainWindow) geminiWebService.setMainWindow(mainWindow);
   });
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -164,6 +166,19 @@ function setupIpcHandlers() {
 
   ipcMain.handle('ai:exportThumbnail', async (_, thumbnailId: string, varIndex: number, text?: string) => {
     return aiService.exportThumbnail(thumbnailId, varIndex, text);
+  });
+
+  ipcMain.handle('db:saveThumbnail', (_, thumbnail) => {
+    return dbService.saveThumbnail(thumbnail);
+  });
+
+  // Gemini Web Studio (Connected Account Bridge)
+  ipcMain.handle('geminiWeb:openStudio', (_, params: { thumbnailId: string; prompt: string }) => {
+    geminiWebService.openStudio(params);
+  });
+
+  ipcMain.handle('geminiWeb:grabImage', async () => {
+    return geminiWebService.grabLatestImage();
   });
 
   // Loop Videos

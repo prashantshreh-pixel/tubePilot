@@ -6,9 +6,9 @@ export class GeminiProvider implements TextProvider {
   private model: string;
   private static cachedWorkingModel: string | null = null;
 
-  constructor(apiKey: string, model: string = 'gemini-3.8-flash') {
+  constructor(apiKey: string, model: string = 'gemini-3-flash-preview') {
     this.apiKey = apiKey;
-    const initial = model === 'gemini-2.5-flash' ? 'gemini-3.8-flash' : model;
+    const initial = (model === 'gemini-2.5-flash' || model === 'gemini-3.8-flash') ? 'gemini-3-flash-preview' : model;
     this.model = GeminiProvider.cachedWorkingModel || initial;
   }
 
@@ -17,15 +17,16 @@ export class GeminiProvider implements TextProvider {
       throw new Error('Google Gemini API key is not configured. Please set your key in Settings.');
     }
 
-    // List of models to try in order: preferred model first, then resilient fallbacks
+    // List of models to try in order: confirmed active models first, then fallbacks
     const candidateModels = Array.from(
       new Set([
+        GeminiProvider.cachedWorkingModel || 'gemini-3-flash-preview',
         this.model,
-        GeminiProvider.cachedWorkingModel || 'gemini-3.8-flash',
-        'gemini-3.8-flash',
+        'gemini-3-flash-preview',
+        'gemini-3.1-flash-lite',
         'gemini-3.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3.8-flash',
       ])
     );
 
@@ -61,7 +62,8 @@ export class GeminiProvider implements TextProvider {
               ],
               generationConfig: {
                 temperature: 0.7,
-                maxOutputTokens: 1200,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
               },
             }),
           });
@@ -79,15 +81,15 @@ export class GeminiProvider implements TextProvider {
               // Keep errorText
             }
 
-            // If 503 (high demand) or 429 (rate limit), retry up to 3 times with backoff
-            if ((response.status === 503 || response.status === 429) && attempt < 3) {
-              console.warn(`[GeminiProvider] ${currentModel} returned ${response.status} (attempt ${attempt}/3). Retrying in ${attempt * 600}ms...`);
-              await new Promise((resolve) => setTimeout(resolve, attempt * 600));
+            // If 503 (high demand) or 429 (rate limit), retry once, then switch model
+            if ((response.status === 503 || response.status === 429) && attempt < 2) {
+              console.warn(`[GeminiProvider] ${currentModel} returned ${response.status} (attempt ${attempt}/2). Retrying in 500ms...`);
+              await new Promise((resolve) => setTimeout(resolve, 500));
               continue;
             }
 
-            // If model is 404 (not found) or 503 persisted after 3 attempts, try next fallback model
-            if ((response.status === 404 || response.status === 503) && i < candidateModels.length - 1) {
+            // If model is 404 (not found), 503 (high demand), or 429 (quota), try next fallback model
+            if ((response.status === 404 || response.status === 503 || response.status === 429) && i < candidateModels.length - 1) {
               console.warn(`[GeminiProvider] Model ${currentModel} returned ${response.status} (${parsedMessage}). Switching to fallback model ${candidateModels[i + 1]}...`);
               break; // breaks inner attempt loop to try next model
             }

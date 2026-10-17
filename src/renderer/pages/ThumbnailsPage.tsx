@@ -17,6 +17,7 @@ import {
   Maximize2,
   X,
   ExternalLink,
+  Upload,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { WorkflowBar } from '../components/WorkflowBar';
@@ -53,6 +54,83 @@ export const ThumbnailsPage: React.FC = () => {
     setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
+  React.useEffect(() => {
+    const unsub = window.tubePilotAPI?.onThumbnailUpdated?.((updated) => {
+      if (updated && (!thumb || updated.id === thumb.id)) {
+        setSelectedThumbnail(updated);
+        addToast('success', '✨ High-resolution image received from your Gemini account!');
+      }
+    });
+    return () => unsub?.();
+  }, [thumb?.id]);
+
+  const handleOpenGeminiStudio = () => {
+    if (!thumb) return;
+    navigator.clipboard.writeText(thumb.prompt);
+    setCopiedPrompt(true);
+    addToast('info', 'Connecting to your Gemini account in Gemini Studio...');
+    setTimeout(() => setCopiedPrompt(false), 2000);
+    window.tubePilotAPI?.openGeminiWebStudio({
+      thumbnailId: thumb.id,
+      prompt: thumb.prompt,
+    });
+  };
+
+  const handleGrabGeminiImage = async () => {
+    try {
+      addToast('info', 'Fetching latest image from Gemini Web...');
+      const res = await window.tubePilotAPI?.grabGeminiWebImage();
+      if (res?.success) {
+        addToast('success', res.message);
+      } else {
+        addToast('warning', res?.message || 'No image found yet. Make sure Gemini has finished generating!');
+      }
+    } catch (e: any) {
+      addToast('error', e.message);
+    }
+  };
+
+  const handleOpenGeminiWeb = () => {
+    if (!thumb) return;
+    navigator.clipboard.writeText(thumb.prompt);
+    setCopiedPrompt(true);
+    addToast('success', 'Prompt copied! Opening Gemini Web in browser...');
+    setTimeout(() => setCopiedPrompt(false), 2000);
+    window.tubePilotAPI?.openExternalUrl('https://gemini.google.com/app');
+  };
+
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleImportImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !thumb) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      const isLandscape = thumb.videoType === 'Long';
+      const newVariation = {
+        id: `var-custom-${Date.now()}`,
+        imageUrl: dataUrl,
+        aspectRatio: isLandscape ? ('16:9' as const) : ('9:16' as const),
+        width: isLandscape ? 1280 : 1080,
+        height: isLandscape ? 720 : 1920,
+      };
+
+      const updatedThumb = {
+        ...thumb,
+        variations: [newVariation, ...(thumb.variations || [])],
+        selectedVariationIndex: 0,
+      };
+
+      setSelectedThumbnail(updatedThumb);
+      await window.tubePilotAPI?.saveThumbnail(updatedThumb);
+      addToast('success', 'Custom image imported and set as #1 variation!');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const handleSelectVariation = (index: number) => {
     if (!thumb) return;
     const updated = { ...thumb, selectedVariationIndex: index };
@@ -66,11 +144,31 @@ export const ThumbnailsPage: React.FC = () => {
   const handleRegenerateImages = async () => {
     if (!thumb) return;
     try {
+      // If user is using Gemini, connect directly to their Gemini account to bypass the 0-quota API cap
+      if (settings?.imageProvider === 'gemini' || !settings?.imageProvider) {
+        handleOpenGeminiStudio();
+        return;
+      }
+
       addToast('info', 'Generating 3 fresh thumbnail visual variations...');
       const updated = await window.tubePilotAPI?.generateThumbnailImages(thumb.id);
       if (updated) {
         setSelectedThumbnail(updated);
-        addToast('success', 'New variations generated!');
+        const allSvg = updated.variations?.every((v: any) =>
+          v.imageUrl?.startsWith('data:image/svg+xml')
+        );
+        if (allSvg) {
+          addToast(
+            'info',
+            'Connecting to your Gemini account in Gemini Studio to generate full-resolution artwork...'
+          );
+          window.tubePilotAPI?.openGeminiWebStudio({
+            thumbnailId: thumb.id,
+            prompt: thumb.prompt,
+          });
+        } else {
+          addToast('success', 'New variations generated!');
+        }
       }
     } catch (err: any) {
       addToast('error', `Generation failed: ${err.message}`);
@@ -240,15 +338,15 @@ export const ThumbnailsPage: React.FC = () => {
                 {/* Custom Text Overlay on preview */}
                 {customText && (
                   <div
-                    className={`absolute ${getPlacementClass()} max-w-[85%] pointer-events-none drop-shadow-2xl select-none transition-all duration-200`}
+                    className={`absolute ${getPlacementClass()} max-w-[90%] pointer-events-none drop-shadow-2xl select-none transition-all duration-200 text-center`}
                     style={{
-                      fontFamily: 'Impact, Arial Black, sans-serif',
-                      textShadow: '0 4px 14px rgba(0,0,0,0.95), 0 0 6px #000',
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      textShadow: '0 4px 18px #4c1d95, 0 0 12px #f59e0b, 0 0 4px #000',
                     }}
                   >
                     <span
-                      className={`${getTextSizeClass()} font-black uppercase rounded-lg bg-black/75 border-2 inline-block`}
-                      style={{ color: fontColor, borderColor: fontColor }}
+                      className={`${getTextSizeClass()} font-extrabold tracking-wide uppercase px-4 py-1.5 rounded-xl bg-slate-950/80 border-2 inline-block`}
+                      style={{ color: fontColor || '#FFFDF0', borderColor: '#fbbf24' }}
                     >
                       {customText}
                     </span>
@@ -260,13 +358,46 @@ export const ThumbnailsPage: React.FC = () => {
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between items-center text-xs font-medium text-slate-300">
                   <span>Pick Your Favorite Variation:</span>
-                  <button
-                    onClick={handleRegenerateImages}
-                    className="flex items-center space-x-1 text-brand-400 hover:text-brand-300 transition"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Regenerate 3 Variations</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleOpenGeminiStudio}
+                      className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-300 hover:text-white font-semibold transition"
+                      title="Connect directly to your Gemini account in Gemini Web Studio"
+                    >
+                      <Sparkles className="w-3 h-3 text-indigo-400" />
+                      <span>Gemini Account</span>
+                    </button>
+                    <button
+                      onClick={handleGrabGeminiImage}
+                      className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-300 hover:text-white font-medium transition"
+                      title="Grab the generated image from your Gemini Studio window"
+                    >
+                      <Download className="w-3 h-3 text-emerald-400" />
+                      <span>Grab Image</span>
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImportImage}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center space-x-1 text-slate-400 hover:text-white transition"
+                      title="Import an image saved from Gemini Web or your computer"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>Import</span>
+                    </button>
+                    <button
+                      onClick={handleRegenerateImages}
+                      className="flex items-center space-x-1 text-brand-400 hover:text-brand-300 transition"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Regen</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
@@ -464,13 +595,23 @@ export const ThumbnailsPage: React.FC = () => {
                     Detailed Generative Prompt
                   </h3>
                 </div>
-                <button
-                  onClick={handleCopyPrompt}
-                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-dark-card hover:bg-dark-hover border border-dark-border text-slate-300 text-xs transition"
-                >
-                  {copiedPrompt ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedPrompt ? 'Copied!' : 'Copy'}</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleOpenGeminiStudio}
+                    className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-md shadow-indigo-500/25"
+                    title="Connect to your Gemini account to generate full-resolution artwork"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Generate in Gemini Account</span>
+                  </button>
+                  <button
+                    onClick={handleCopyPrompt}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-dark-card hover:bg-dark-hover border border-dark-border text-slate-300 text-xs transition"
+                  >
+                    {copiedPrompt ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedPrompt ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="p-3.5 rounded-xl bg-dark-bg/80 border border-dark-border font-mono text-[11px] text-slate-300 leading-relaxed max-h-48 overflow-y-auto">
